@@ -1,0 +1,29 @@
+{
+  "name": "graphx",
+  "version": "0.1.0",
+  "description": "Static analysis CLI that traces execution flow through a codebase (NestJS first) and generates a clickable flow diagram.",
+  "main": "dist/index.js",
+  "bin": {
+    "graphx": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "codebase",
+    "visualization",
+    "nestjs",
+    "static-analysis"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "ts-morph": "^24.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
