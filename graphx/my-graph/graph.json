@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-14T22:10:58.050Z",
+  "entryPoints": [
+    {
+      "httpMethod": "GET",
+      "path": "",
+      "controllerName": "AppController",
+      "methodName": "getHello",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/app.controller.ts",
+      "line": 8
+    },
+    {
+      "httpMethod": "GET",
+      "path": "user",
+      "controllerName": "UserController",
+      "methodName": "getUsers",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 19
+    },
+    {
+      "httpMethod": "GET",
+      "path": "user/:id",
+      "controllerName": "UserController",
+      "methodName": "getUserById",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 24
+    },
+    {
+      "httpMethod": "POST",
+      "path": "user",
+      "controllerName": "UserController",
+      "methodName": "createUser",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 29
+    },
+    {
+      "httpMethod": "PUT",
+      "path": "user/:id",
+      "controllerName": "UserController",
+      "methodName": "updateUser",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 34
+    },
+    {
+      "httpMethod": "DELETE",
+      "path": "user/:id",
+      "controllerName": "UserController",
+      "methodName": "deleteUserById",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 39
+    }
+  ],
+  "nodes": [
+    {
+      "id": "entry:GET:",
+      "label": "GET /",
+      "kind": "entry"
+    },
+    {
+      "id": "AppController.getHello",
+      "label": "AppController.getHello",
+      "kind": "controller",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/app.controller.ts",
+      "line": 8,
+      "snippet": "@Get()\n  getHello(): string {\n    return this.appService.getHello();\n  }"
+    },
+    {
+      "id": "AppService.getHello",
+      "label": "AppService.getHello",
+      "kind": "service",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/app.service.ts",
+      "line": 5,
+      "snippet": "getHello(): string {\n    return 'Hello World!';\n  }"
+    },
+    {
+      "id": "entry:GET:user",
+      "label": "GET /user",
+      "kind": "entry"
+    },
+    {
+      "id": "UserController.getUsers",
+      "label": "UserController.getUsers",
+      "kind": "controller",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 19,
+      "snippet": "@Get()\n    getUsers(): User[] {\n        return this.userService.findAllUsers();\n    }"
+    },
+    {
+      "id": "UserService.findAllUsers",
+      "label": "UserService.findAllUsers",
+      "kind": "service",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.service.ts",
+      "line": 22,
+      "snippet": "findAllUsers(): User[] {\n        this.logger.log('Getting all users');\n        return this.users;\n    }"
+    },
+    {
+      "id": "LoggerService.log",
+      "label": "LoggerService.log",
+      "kind": "service",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.logger.ts",
+      "line": 5,
+      "snippet": "log(message: string){\n        console.log(message);\n    }"
+    },
+    {
+      "id": "entry:GET:user/:id",
+      "label": "GET /user/:id",
+      "kind": "entry"
+    },
+    {
+      "id": "UserController.getUserById",
+      "label": "UserController.getUserById",
+      "kind": "controller",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 24,
+      "snippet": "@Get(':id')\n    getUserById(@Param('id', ParseIntPipe) id: number) {\n        return this.userService.findUserById(id);\n    }"
+    },
+    {
+      "id": "UserService.findUserById",
+      "label": "UserService.findUserById",
+      "kind": "service",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.service.ts",
+      "line": 27,
+      "snippet": "findUserById(id: number): User {\n        this.logger.log('Getting User by its Id');\n        const user = this.users.find(user => user.id === id);\n        if (!user) {\n          throw new NotFoundException(`User ${id} not found`);\n        }\n        return user;\n      }"
+    },
+    {
+      "id": "entry:POST:user",
+      "label": "POST /user",
+      "kind": "entry"
+    },
+    {
+      "id": "UserController.createUser",
+      "label": "UserController.createUser",
+      "kind": "controller",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 29,
+      "snippet": "@Post()\n    createUser(@Body() createUserDto: CreateUserDto){\n        return this.userService.createUser(createUserDto);\n    }"
+    },
+    {
+      "id": "UserService.createUser",
+      "label": "UserService.createUser",
+      "kind": "service",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.service.ts",
+      "line": 36,
+      "snippet": "createUser(createUserDto: CreateUserDto) {\n        this.logger.log('Creating a User');\n\n        const duplicate = this.users.find(\n            (user) =>\n              user.name === createUserDto.name ||\n              user.email === createUserDto.email,\n          );\n          \n          if (duplicate"
+    },
+    {
+      "id": "entry:PUT:user/:id",
+      "label": "PUT /user/:id",
+      "kind": "entry"
+    },
+    {
+      "id": "UserController.updateUser",
+      "label": "UserController.updateUser",
+      "kind": "controller",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 34,
+      "snippet": "@Put(':id')\n    updateUser(@Param('id') id:string, @Body() updateUserDto: UpdateUserDto){\n        return this.userService.updateUser(Number(id), updateUserDto);\n    }"
+    },
+    {
+      "id": "UserService.updateUser",
+      "label": "UserService.updateUser",
+      "kind": "service",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.service.ts",
+      "line": 58,
+      "snippet": "updateUser( id :number, updateUserDto: UpdateUserDto){\n        this.logger.log('Updating a User');\n\n        const duplicate = this.users.find(\n            (user) => user.name === updateUserDto.name,\n            (user) => user.email === updateUserDto.email\n        );\n\n        if(duplicate)\n        {\n"
+    },
+    {
+      "id": "entry:DELETE:user/:id",
+      "label": "DELETE /user/:id",
+      "kind": "entry"
+    },
+    {
+      "id": "UserController.deleteUserById",
+      "label": "UserController.deleteUserById",
+      "kind": "controller",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 39,
+      "snippet": "@Delete(':id')\n    @UseGuards(RoleGuard)\n    deleteUserById(@Param('id') id: number){\n        this.logger.log(\"debugger\");\n\n        return this.userService.deleteUser(Number(id));\n    }"
+    },
+    {
+      "id": "UserService.deleteUser",
+      "label": "UserService.deleteUser",
+      "kind": "service",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.service.ts",
+      "line": 79,
+      "snippet": "deleteUser(id: number): User{\n        this.logger.log(\"Enters deleteUser func\");\n        console.log(id);\n\n        const userIndex = this.users.findIndex(user => user.id === id)\n        if (userIndex === -1) {\n            throw new NotFoundException(`User ${id} not found`);\n          }\n\n        cons"
+    }
+  ],
+  "edges": [
+    {
+      "from": "AppController.getHello",
+      "to": "AppService.getHello",
+      "kind": "calls"
+    },
+    {
+      "from": "entry:GET:",
+      "to": "AppController.getHello",
+      "kind": "triggers"
+    },
+    {
+      "from": "UserService.findAllUsers",
+      "to": "LoggerService.log",
+      "kind": "calls"
+    },
+    {
+      "from": "UserController.getUsers",
+      "to": "UserService.findAllUsers",
+      "kind": "calls"
+    },
+    {
+      "from": "entry:GET:user",
+      "to": "UserController.getUsers",
+      "kind": "triggers"
+    },
+    {
+      "from": "UserService.findUserById",
+      "to": "LoggerService.log",
+      "kind": "calls"
+    },
+    {
+      "from": "UserController.getUserById",
+      "to": "UserService.findUserById",
+      "kind": "calls"
+    },
+    {
+      "from": "entry:GET:user/:id",
+      "to": "UserController.getUserById",
+      "kind": "triggers"
+    },
+    {
+      "from": "UserService.createUser",
+      "to": "LoggerService.log",
+      "kind": "calls"
+    },
+    {
+      "from": "UserController.createUser",
+      "to": "UserService.createUser",
+      "kind": "calls"
+    },
+    {
+      "from": "entry:POST:user",
+      "to": "UserController.createUser",
+      "kind": "triggers"
+    },
+    {
+      "from": "UserService.updateUser",
+      "to": "LoggerService.log",
+      "kind": "calls"
+    },
+    {
+      "from": "UserController.updateUser",
+      "to": "UserService.updateUser",
+      "kind": "calls"
+    },
+    {
+      "from": "entry:PUT:user/:id",
+      "to": "UserController.updateUser",
+      "kind": "triggers"
+    },
+    {
+      "from": "UserController.deleteUserById",
+      "to": "LoggerService.log",
+      "kind": "calls"
+    },
+    {
+      "from": "UserService.deleteUser",
+      "to": "LoggerService.log",
+      "kind": "calls"
+    },
+    {
+      "from": "UserController.deleteUserById",
+      "to": "UserService.deleteUser",
+      "kind": "calls"
+    },
+    {
+      "from": "entry:DELETE:user/:id",
+      "to": "UserController.deleteUserById",
+      "kind": "triggers"
+    }
+  ],
+  "warnings": []
+}
