@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>graphx viewer</title>
+<style>
+  :root {
+    --bg: #0b0b0d;
+    --card-bg: #17171b;
+    --card-border: #2a2a30;
+    --text: #e8e8ea;
+    --text-dim: #8a8a92;
+    --line: #3a3a42;
+    --entry: #f5a623;
+    --controller: #f2994a;
+    --service: #4f8cff;
+    --external: #2dd4bf;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+  #toolbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 56px;
+    display: flex; align-items: center; gap: 16px; padding: 0 20px;
+    background: #0f0f12; border-bottom: 1px solid var(--card-border); z-index: 10;
+  }
+  #toolbar h1 { font-size: 15px; font-weight: 600; margin: 0; }
+  #toolbar .stats { font-size: 13px; color: var(--text-dim); }
+  #toolbar input[type=file] { color: var(--text-dim); font-size: 13px; }
+  #toolbar .warn { color: var(--entry); font-size: 13px; }
+  #empty-state {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; color: var(--text-dim); font-size: 14px;
+  }
+  #canvas-wrap {
+    position: absolute; top: 56px; left: 0; right: 0; bottom: 0;
+    overflow: auto;
+  }
+  #canvas { position: relative; }
+  svg#edges { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .node-card {
+    position: absolute; width: 220px; min-height: 64px;
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 10px 12px; cursor: pointer;
+    transition: border-color 0.12s, transform 0.12s;
+  }
+  .node-card:hover { border-color: #55555f; transform: translateY(-1px); }
+  .node-card.selected { border-color: var(--service); box-shadow: 0 0 0 1px var(--service); }
+  .node-card .kind-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 6px;
+  }
+  .node-card .kind-dot.entry { background: var(--entry); }
+  .node-card .kind-dot.controller { background: var(--controller); }
+  .node-card .kind-dot.service { background: var(--service); }
+  .node-card .kind-dot.external { background: var(--external); }
+  .node-card .label { font-size: 13px; font-weight: 600; }
+  .node-card .sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+  #detail-panel {
+    position: fixed; top: 56px; right: 0; bottom: 0; width: 380px;
+    background: #0f0f12; border-left: 1px solid var(--card-border);
+    padding: 18px; overflow-y: auto; transform: translateX(100%);
+    transition: transform 0.15s; z-index: 5;
+  }
+  #detail-panel.open { transform: translateX(0); }
+  #detail-panel h2 { font-size: 15px; margin: 0 0 4px 0; }
+  #detail-panel .meta { font-size: 12px; color: var(--text-dim); margin-bottom: 14px; }
+  #detail-panel pre {
+    background: #000; border: 1px solid var(--card-border); border-radius: 8px;
+    padding: 12px; font-size: 12px; line-height: 1.5; overflow-x: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  #detail-panel .close-btn {
+    float: right; cursor: pointer; color: var(--text-dim); font-size: 13px;
+    background: none; border: none;
+  }
+</style>
+</head>
+<body>
+<!-- GRAPHX_DATA_INJECTION_POINT -->
+
+<div id="toolbar">
+  <h1>graphx viewer</h1>
+  <input type="file" id="fileInput" accept=".json" />
+  <span class="stats" id="stats"></span>
+  <span class="warn" id="warnCount"></span>
+</div>
+
+<div id="canvas-wrap">
+  <div id="empty-state">Load a graph.json file to view the flow.</div>
+  <div id="canvas">
+    <svg id="edges"></svg>
+    <div id="nodesLayer"></div>
+  </div>
+</div>
+
+<div id="detail-panel">
+  <button class="close-btn" id="closeDetail">close ✕</button>
+  <h2 id="detailLabel"></h2>
+  <div class="meta" id="detailMeta"></div>
+  <pre id="detailSnippet"></pre>
+</div>
+
+<script>
+  const COL_WIDTH = 280;
+  const CARD_HEIGHT_EST = 90;
+  const ROW_GAP = 30;
+  const START_X = 40;
+  const START_Y = 30;
+
+  const fileInput = document.getElementById("fileInput");
+  const emptyState = document.getElementById("empty-state");
+  const canvas = document.getElementById("canvas");
+  const svg = document.getElementById("edges");
+  const nodesLayer = document.getElementById("nodesLayer");
+  const statsEl = document.getElementById("stats");
+  const warnEl = document.getElementById("warnCount");
+  const detailPanel = document.getElementById("detail-panel");
+  const detailLabel = document.getElementById("detailLabel");
+  const detailMeta = document.getElementById("detailMeta");
+  const detailSnippet = document.getElementById("detailSnippet");
+  document.getElementById("closeDetail").onclick = () => detailPanel.classList.remove("open");
+
+  // If a standalone viewer was generated with embedded data (graphx analyze --open),
+  // render immediately and hide the file picker — no manual load step needed.
+  if (window.__GRAPHX_DATA__) {
+    fileInput.style.display = "none";
+    render(window.__GRAPHX_DATA__);
+  }
+
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        render(data);
+      } catch (err) {
+        alert("Could not parse that file as JSON: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  function render(data) {
+    const nodes = data.nodes || [];
+    const edges = data.edges || [];
+    const warnings = data.warnings || [];
+
+    emptyState.style.display = "none";
+    statsEl.textContent = `${nodes.length} nodes · ${edges.length} edges`;
+    warnEl.textContent = warnings.length ? `${warnings.length} warning(s)` : "";
+
+    const levels = assignLevels(nodes, edges);
+    const positions = layoutPositions(levels);
+
+    drawNodes(nodes, positions);
+    drawEdges(edges, positions, nodes);
+
+    const maxCol = Math.max(1, ...Object.values(positions).map((p) => p.col + 1));
+    const maxRowsPerCol = {};
+    Object.values(positions).forEach((p) => {
+      maxRowsPerCol[p.col] = Math.max(maxRowsPerCol[p.col] || 0, p.row + 1);
+    });
+    const maxRow = Math.max(1, ...Object.values(maxRowsPerCol));
+    canvas.style.width = (START_X + maxCol * COL_WIDTH + 240) + "px";
+    canvas.style.height = (START_Y + maxRow * (CARD_HEIGHT_EST + ROW_GAP) + 100) + "px";
+    svg.setAttribute("width", canvas.style.width);
+    svg.setAttribute("height", canvas.style.height);
+  }
+
+  // BFS from nodes with kind "entry" (or no incoming edges) to assign a column per node.
+  function assignLevels(nodes, edges) {
+    const incoming = new Map(nodes.map((n) => [n.id, 0]));
+    edges.forEach((e) => incoming.set(e.to, (incoming.get(e.to) || 0) + 1));
+
+    const adjacency = new Map(nodes.map((n) => [n.id, []]));
+    edges.forEach((e) => {
+      if (adjacency.has(e.from)) adjacency.get(e.from).push(e.to);
+    });
+
+    const roots = nodes.filter((n) => n.kind === "entry" || incoming.get(n.id) === 0);
+    const level = new Map();
+    let queue = roots.map((n) => ({ id: n.id, lvl: 0 }));
+    roots.forEach((n) => level.set(n.id, 0));
+
+    while (queue.length) {
+      const { id, lvl } = queue.shift();
+      for (const nextId of adjacency.get(id) || []) {
+        if (!level.has(nextId) || level.get(nextId) > lvl + 1) {
+          level.set(nextId, lvl + 1);
+          queue.push({ id: nextId, lvl: lvl + 1 });
+        }
+      }
+    }
+
+    // Anything unreached (disconnected/orphan) goes in its own trailing column.
+    const maxLvl = Math.max(0, ...Array.from(level.values()));
+    nodes.forEach((n) => {
+      if (!level.has(n.id)) level.set(n.id, maxLvl + 1);
+    });
+
+    return level;
+  }
+
+  function layoutPositions(levelMap) {
+    const byCol = new Map();
+    levelMap.forEach((lvl, id) => {
+      if (!byCol.has(lvl)) byCol.set(lvl, []);
+      byCol.get(lvl).push(id);
+    });
+
+    const positions = {};
+    byCol.forEach((ids, col) => {
+      ids.forEach((id, row) => {
+        positions[id] = {
+          col,
+          row,
+          x: START_X + col * COL_WIDTH,
+          y: START_Y + row * (CARD_HEIGHT_EST + ROW_GAP),
+        };
+      });
+    });
+    return positions;
+  }
+
+  function drawNodes(nodes, positions) {
+    nodesLayer.innerHTML = "";
+    nodes.forEach((node) => {
+      const pos = positions[node.id];
+      if (!pos) return;
+
+      const card = document.createElement("div");
+      card.className = "node-card";
+      card.style.left = pos.x + "px";
+      card.style.top = pos.y + "px";
+      card.dataset.nodeId = node.id;
+
+      const kind = node.kind || "service";
+      card.innerHTML = `
+        <div class="label"><span class="kind-dot ${kind}"></span>${escapeHtml(node.label)}</div>
+        <div class="sub">${escapeHtml(subtitleFor(node))}</div>
+      `;
+      card.onclick = () => selectNode(node, card);
+      nodesLayer.appendChild(card);
+    });
+  }
+
+  function subtitleFor(node) {
+    if (node.kind === "entry") return "entry point";
+    if (node.filePath) {
+      const short = node.filePath.split("/").slice(-1)[0];
+      return node.line ? `${short}:${node.line}` : short;
+    }
+    return node.kind || "";
+  }
+
+  function selectNode(node, cardEl) {
+    document.querySelectorAll(".node-card.selected").forEach((c) => c.classList.remove("selected"));
+    cardEl.classList.add("selected");
+
+    detailLabel.textContent = node.label;
+    detailMeta.textContent = [node.kind, node.filePath, node.line ? `line ${node.line}` : null]
+      .filter(Boolean).join(" · ");
+    detailSnippet.textContent = node.snippet || "(no snippet captured for this node)";
+    detailPanel.classList.add("open");
+  }
+
+  function drawEdges(edges, positions, nodes) {
+    const CARD_W = 220;
+    svg.innerHTML = `
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 Z" fill="#55555f" />
+        </marker>
+      </defs>
+    `;
+
+    // Multiple edges leaving the same node, or arriving at the same node,
+    // used to all meet at one exact pixel (the card's vertical center) —
+    // that's what caused lines to overlap and cross messily on fan-in nodes
+    // like a shared logger. Instead, spread each edge's anchor point along
+    // the card's height based on its position among siblings sharing that node.
+    const outgoingByNode = new Map();
+    const incomingByNode = new Map();
+    edges.forEach((e, i) => {
+      if (!outgoingByNode.has(e.from)) outgoingByNode.set(e.from, []);
+      outgoingByNode.get(e.from).push(i);
+      if (!incomingByNode.has(e.to)) incomingByNode.set(e.to, []);
+      incomingByNode.get(e.to).push(i);
+    });
+
+    // Spreading anchors evenly isn't enough on its own — if the anchors are
+    // ordered by discovery order rather than by where the *other* card sits
+    // vertically, lines still cross each other in a little knot before they
+    // arrive. Sorting each node's siblings by the other end's Y position means
+    // a line from a higher-up card always lands on a higher anchor, so lines
+    // fan out cleanly instead of crossing.
+    outgoingByNode.forEach((indices) => {
+      indices.sort((a, b) => {
+        const posA = positions[edges[a].to];
+        const posB = positions[edges[b].to];
+        return (posA ? posA.y : 0) - (posB ? posB.y : 0);
+      });
+    });
+    incomingByNode.forEach((indices) => {
+      indices.sort((a, b) => {
+        const posA = positions[edges[a].from];
+        const posB = positions[edges[b].from];
+        return (posA ? posA.y : 0) - (posB ? posB.y : 0);
+      });
+    });
+
+    function anchorY(nodeId, edgeIndex, byNodeMap, pos) {
+      const siblings = byNodeMap.get(nodeId) || [];
+      const order = siblings.indexOf(edgeIndex);
+      if (siblings.length <= 1) return pos.y + CARD_HEIGHT_EST / 2;
+      const margin = 16;
+      const usable = CARD_HEIGHT_EST - margin * 2;
+      return pos.y + margin + (usable * order) / (siblings.length - 1);
+    }
+
+    edges.forEach((edge, i) => {
+      const from = positions[edge.from];
+      const to = positions[edge.to];
+      if (!from || !to) return;
+
+      const x1 = from.x + CARD_W, y1 = anchorY(edge.from, i, outgoingByNode, from);
+      const x2 = to.x, y2 = anchorY(edge.to, i, incomingByNode, to);
+      const midX = (x1 + x2) / 2;
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute(
+        "d",
+        `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+      );
+      path.setAttribute("stroke", "#3a3a42");
+      path.setAttribute("stroke-width", "1.5");
+      path.setAttribute("fill", "none");
+      path.setAttribute("marker-end", "url(#arrow)");
+      svg.appendChild(path);
+    });
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+</script>
+</body>
+</html>
