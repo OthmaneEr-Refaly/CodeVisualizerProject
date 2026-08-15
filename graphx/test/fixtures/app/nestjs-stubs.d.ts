@@ -8,4 +8,17 @@ declare module "@nestjs/common" {
   export function Patch(path?: string): MethodDecorator;
   export function Param(key?: string): ParameterDecorator;
   export function Body(): ParameterDecorator;
+  export function UseGuards(...guards: unknown[]): ClassDecorator & MethodDecorator;
+  export function Module(metadata: { controllers?: unknown[]; providers?: unknown[] }): ClassDecorator;
+
+  export interface MiddlewareConsumer {
+    apply(...middleware: unknown[]): {
+      forRoutes(...routes: unknown[]): unknown;
+      exclude(...routes: unknown[]): { forRoutes(...routes: unknown[]): unknown };
+    };
+  }
+
+  export interface NestModule {
+    configure(consumer: MiddlewareConsumer): void;
+  }
 }

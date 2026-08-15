@@ -47,9 +47,41 @@ export function walkCallGraph(project: Project, entryPoints: EntryPoint[]): Walk
     });
 
     const controllerNodeId = walkMethod(cls, method, "controller", 0);
-    if (controllerNodeId) {
-      edges.push({ from: entryNodeId, to: controllerNodeId, kind: "triggers" });
+    if (!controllerNodeId) continue;
+
+    // Chain order matches NestJS's real request lifecycle:
+    // entry -> middleware -> guard -> controller -> service...
+    let lastNodeId = entryNodeId;
+
+    if (entry.middleware.length > 0) {
+      const middlewareNodeId = `middleware:${entryNodeId}`;
+      nodes.set(middlewareNodeId, {
+        id: middlewareNodeId,
+        label: `Middleware: ${entry.middleware.join(", ")}`,
+        kind: "middleware",
+        filePath: entry.filePath,
+        line: entry.line,
+        snippet: entry.middlewareSnippet,
+      });
+      edges.push({ from: lastNodeId, to: middlewareNodeId, kind: "triggers" });
+      lastNodeId = middlewareNodeId;
     }
+
+    if (entry.guards.length > 0) {
+      const guardNodeId = `guard:${entryNodeId}`;
+      nodes.set(guardNodeId, {
+        id: guardNodeId,
+        label: `Guards: ${entry.guards.join(", ")}`,
+        kind: "guard",
+        filePath: entry.filePath,
+        line: entry.line,
+        snippet: entry.guardsSnippet,
+      });
+      edges.push({ from: lastNodeId, to: guardNodeId, kind: "triggers" });
+      lastNodeId = guardNodeId;
+    }
+
+    edges.push({ from: lastNodeId, to: controllerNodeId, kind: "triggers" });
   }
 
   return { nodes: Array.from(nodes.values()), edges, warnings };

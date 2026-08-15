@@ -10,6 +10,28 @@ export interface EntryPoint {
   methodName: string;
   filePath: string;
   line: number;
+  /** Names from @UseGuards, combining class-level (applies to all routes) + method-level. Empty if none. */
+  guards: string[];
+  /** Raw @UseGuards decorator text(s), for display when a guard node is clicked. */
+  guardsSnippet?: string;
+  /** Middleware class names bound to this route via a module's configure(). Empty if none. */
+  middleware: string[];
+  /** Raw consumer.apply(...).forRoutes(...) source text(s), for display when a middleware node is clicked. */
+  middlewareSnippet?: string;
+}
+
+/**
+ * One `consumer.apply(X, Y).forRoutes(pattern)` binding found inside a
+ * NestModule's configure() method. routePatterns are either quoted path
+ * strings ('users') or controller class names (UserController) — either
+ * form NestJS accepts in forRoutes(...).
+ */
+export interface MiddlewareBinding {
+  middlewareNames: string[];
+  routePatterns: string[];
+  filePath: string;
+  line: number;
+  snippet: string;
 }
 
 export interface ScanResult {
@@ -43,7 +65,7 @@ export class EntryPointScanError extends GraphxError {
 
 // --- Graph output (stage 3: call-graph walker) ---
 
-export type NodeKind = "entry" | "controller" | "service" | "external";
+export type NodeKind = "entry" | "middleware" | "guard" | "controller" | "service" | "external";
 export type EdgeKind = "triggers" | "calls";
 
 export interface GraphNode {
