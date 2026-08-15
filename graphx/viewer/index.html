@@ -12,6 +12,8 @@
     --text-dim: #8a8a92;
     --line: #3a3a42;
     --entry: #f5a623;
+    --middleware: #22d3ee;
+    --guard: #a78bfa;
     --controller: #f2994a;
     --service: #4f8cff;
     --external: #2dd4bf;
@@ -54,6 +56,8 @@
     margin-right: 6px;
   }
   .node-card .kind-dot.entry { background: var(--entry); }
+  .node-card .kind-dot.middleware { background: var(--middleware); }
+  .node-card .kind-dot.guard { background: var(--guard); }
   .node-card .kind-dot.controller { background: var(--controller); }
   .node-card .kind-dot.service { background: var(--service); }
   .node-card .kind-dot.external { background: var(--external); }
@@ -173,24 +177,38 @@
     svg.setAttribute("height", canvas.style.height);
   }
 
-  // BFS from nodes with kind "entry" (or no incoming edges) to assign a column per node.
+  // Columns are assigned by conceptual stage, not raw graph distance.
+  // entry/guard/controller each get a fixed column (0/1/2) — a route with no
+  // guard just leaves column 1 empty for that row, rather than pulling its
+  // controller and everything downstream one column to the left. Without this,
+  // routes with a guard end up staircased one column further right than
+  // routes without one, and same-stage cards stop lining up across rows.
+  const STAGE_COLUMN = { entry: 0, middleware: 1, guard: 2, controller: 3 };
+
   function assignLevels(nodes, edges) {
-    const incoming = new Map(nodes.map((n) => [n.id, 0]));
-    edges.forEach((e) => incoming.set(e.to, (incoming.get(e.to) || 0) + 1));
+    const level = new Map();
+
+    nodes.forEach((n) => {
+      if (n.kind in STAGE_COLUMN) level.set(n.id, STAGE_COLUMN[n.kind]);
+    });
 
     const adjacency = new Map(nodes.map((n) => [n.id, []]));
     edges.forEach((e) => {
       if (adjacency.has(e.from)) adjacency.get(e.from).push(e.to);
     });
 
-    const roots = nodes.filter((n) => n.kind === "entry" || incoming.get(n.id) === 0);
-    const level = new Map();
-    let queue = roots.map((n) => ({ id: n.id, lvl: 0 }));
-    roots.forEach((n) => level.set(n.id, 0));
+    const fixedNodeIds = new Set(nodes.filter((n) => n.kind in STAGE_COLUMN).map((n) => n.id));
+
+    // BFS forward from every controller (fixed at column 2) to place service /
+    // external nodes at column 3, 4, 5... by how many hops deep they are.
+    // Fixed-stage nodes are never revisited — their column is already decided.
+    const controllerNodes = nodes.filter((n) => n.kind === "controller");
+    let queue = controllerNodes.map((n) => ({ id: n.id, lvl: level.get(n.id) }));
 
     while (queue.length) {
       const { id, lvl } = queue.shift();
       for (const nextId of adjacency.get(id) || []) {
+        if (fixedNodeIds.has(nextId)) continue;
         if (!level.has(nextId) || level.get(nextId) > lvl + 1) {
           level.set(nextId, lvl + 1);
           queue.push({ id: nextId, lvl: lvl + 1 });
@@ -198,7 +216,8 @@
       }
     }
 
-    // Anything unreached (disconnected/orphan) goes in its own trailing column.
+    // Anything still unreached (disconnected/orphan, or entry/guard nodes with
+    // no controller downstream) goes in its own trailing column.
     const maxLvl = Math.max(0, ...Array.from(level.values()));
     nodes.forEach((n) => {
       if (!level.has(n.id)) level.set(n.id, maxLvl + 1);

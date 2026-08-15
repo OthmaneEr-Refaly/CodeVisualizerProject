@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-14T22:10:58.050Z",
+  "generatedAt": "2026-08-15T16:03:29.691Z",
   "entryPoints": [
     {
       "httpMethod": "GET",
@@ -8,7 +8,9 @@
       "controllerName": "AppController",
       "methodName": "getHello",
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/app.controller.ts",
-      "line": 8
+      "line": 8,
+      "guards": [],
+      "middleware": []
     },
     {
       "httpMethod": "GET",
@@ -16,7 +18,12 @@
       "controllerName": "UserController",
       "methodName": "getUsers",
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
-      "line": 19
+      "line": 19,
+      "guards": [],
+      "middleware": [
+        "ApiKeyMiddleware"
+      ],
+      "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
       "httpMethod": "GET",
@@ -24,7 +31,12 @@
       "controllerName": "UserController",
       "methodName": "getUserById",
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
-      "line": 24
+      "line": 24,
+      "guards": [],
+      "middleware": [
+        "ApiKeyMiddleware"
+      ],
+      "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
       "httpMethod": "POST",
@@ -32,7 +44,12 @@
       "controllerName": "UserController",
       "methodName": "createUser",
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
-      "line": 29
+      "line": 29,
+      "guards": [],
+      "middleware": [
+        "ApiKeyMiddleware"
+      ],
+      "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
       "httpMethod": "PUT",
@@ -40,7 +57,12 @@
       "controllerName": "UserController",
       "methodName": "updateUser",
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
-      "line": 34
+      "line": 34,
+      "guards": [],
+      "middleware": [
+        "ApiKeyMiddleware"
+      ],
+      "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
       "httpMethod": "DELETE",
@@ -48,7 +70,15 @@
       "controllerName": "UserController",
       "methodName": "deleteUserById",
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
-      "line": 39
+      "line": 39,
+      "guards": [
+        "RoleGuard"
+      ],
+      "guardsSnippet": "@UseGuards(RoleGuard)",
+      "middleware": [
+        "ApiKeyMiddleware"
+      ],
+      "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     }
   ],
   "nodes": [
@@ -103,6 +133,14 @@
       "snippet": "log(message: string){\n        console.log(message);\n    }"
     },
     {
+      "id": "middleware:entry:GET:user",
+      "label": "Middleware: ApiKeyMiddleware",
+      "kind": "middleware",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 19,
+      "snippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
+    },
+    {
       "id": "entry:GET:user/:id",
       "label": "GET /user/:id",
       "kind": "entry"
@@ -122,6 +160,14 @@
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.service.ts",
       "line": 27,
       "snippet": "findUserById(id: number): User {\n        this.logger.log('Getting User by its Id');\n        const user = this.users.find(user => user.id === id);\n        if (!user) {\n          throw new NotFoundException(`User ${id} not found`);\n        }\n        return user;\n      }"
+    },
+    {
+      "id": "middleware:entry:GET:user/:id",
+      "label": "Middleware: ApiKeyMiddleware",
+      "kind": "middleware",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 24,
+      "snippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
       "id": "entry:POST:user",
@@ -145,6 +191,14 @@
       "snippet": "createUser(createUserDto: CreateUserDto) {\n        this.logger.log('Creating a User');\n\n        const duplicate = this.users.find(\n            (user) =>\n              user.name === createUserDto.name ||\n              user.email === createUserDto.email,\n          );\n          \n          if (duplicate"
     },
     {
+      "id": "middleware:entry:POST:user",
+      "label": "Middleware: ApiKeyMiddleware",
+      "kind": "middleware",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 29,
+      "snippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
+    },
+    {
       "id": "entry:PUT:user/:id",
       "label": "PUT /user/:id",
       "kind": "entry"
@@ -166,6 +220,14 @@
       "snippet": "updateUser( id :number, updateUserDto: UpdateUserDto){\n        this.logger.log('Updating a User');\n\n        const duplicate = this.users.find(\n            (user) => user.name === updateUserDto.name,\n            (user) => user.email === updateUserDto.email\n        );\n\n        if(duplicate)\n        {\n"
     },
     {
+      "id": "middleware:entry:PUT:user/:id",
+      "label": "Middleware: ApiKeyMiddleware",
+      "kind": "middleware",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 34,
+      "snippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
+    },
+    {
       "id": "entry:DELETE:user/:id",
       "label": "DELETE /user/:id",
       "kind": "entry"
@@ -185,6 +247,22 @@
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.service.ts",
       "line": 79,
       "snippet": "deleteUser(id: number): User{\n        this.logger.log(\"Enters deleteUser func\");\n        console.log(id);\n\n        const userIndex = this.users.findIndex(user => user.id === id)\n        if (userIndex === -1) {\n            throw new NotFoundException(`User ${id} not found`);\n          }\n\n        cons"
+    },
+    {
+      "id": "middleware:entry:DELETE:user/:id",
+      "label": "Middleware: ApiKeyMiddleware",
+      "kind": "middleware",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 39,
+      "snippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
+    },
+    {
+      "id": "guard:entry:DELETE:user/:id",
+      "label": "Guards: RoleGuard",
+      "kind": "guard",
+      "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/user/user.controller.ts",
+      "line": 39,
+      "snippet": "@UseGuards(RoleGuard)"
     }
   ],
   "edges": [
@@ -210,6 +288,11 @@
     },
     {
       "from": "entry:GET:user",
+      "to": "middleware:entry:GET:user",
+      "kind": "triggers"
+    },
+    {
+      "from": "middleware:entry:GET:user",
       "to": "UserController.getUsers",
       "kind": "triggers"
     },
@@ -225,6 +308,11 @@
     },
     {
       "from": "entry:GET:user/:id",
+      "to": "middleware:entry:GET:user/:id",
+      "kind": "triggers"
+    },
+    {
+      "from": "middleware:entry:GET:user/:id",
       "to": "UserController.getUserById",
       "kind": "triggers"
     },
@@ -240,6 +328,11 @@
     },
     {
       "from": "entry:POST:user",
+      "to": "middleware:entry:POST:user",
+      "kind": "triggers"
+    },
+    {
+      "from": "middleware:entry:POST:user",
       "to": "UserController.createUser",
       "kind": "triggers"
     },
@@ -255,6 +348,11 @@
     },
     {
       "from": "entry:PUT:user/:id",
+      "to": "middleware:entry:PUT:user/:id",
+      "kind": "triggers"
+    },
+    {
+      "from": "middleware:entry:PUT:user/:id",
       "to": "UserController.updateUser",
       "kind": "triggers"
     },
@@ -275,6 +373,16 @@
     },
     {
       "from": "entry:DELETE:user/:id",
+      "to": "middleware:entry:DELETE:user/:id",
+      "kind": "triggers"
+    },
+    {
+      "from": "middleware:entry:DELETE:user/:id",
+      "to": "guard:entry:DELETE:user/:id",
+      "kind": "triggers"
+    },
+    {
+      "from": "guard:entry:DELETE:user/:id",
       "to": "UserController.deleteUserById",
       "kind": "triggers"
     }

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadProject } from "./parser";
 import { scanEntryPoints } from "./entryScanner";
+import { scanMiddleware, attachMiddleware } from "./middlewareScanner";
 import { walkCallGraph } from "./callWalker";
 import { GraphxError, ScanWarning } from "./types";
 
@@ -50,21 +51,23 @@ export function analyze(rootDir: string, options: AnalyzeOptions = {}): AnalyzeS
   }
 
   const scanResult = scanEntryPoints(project);
-  const walkResult = walkCallGraph(project, scanResult.entryPoints);
+  const middlewareResult = scanMiddleware(project);
+  const entryPointsWithMiddleware = attachMiddleware(scanResult.entryPoints, middlewareResult.bindings);
+  const walkResult = walkCallGraph(project, entryPointsWithMiddleware);
 
-  const allWarnings = [...scanResult.warnings, ...walkResult.warnings];
+  const allWarnings = [...scanResult.warnings, ...middlewareResult.warnings, ...walkResult.warnings];
 
   const output = {
     schemaVersion: GRAPH_SCHEMA_VERSION,
     generatedAt: new Date().toISOString(),
-    entryPoints: scanResult.entryPoints,
+    entryPoints: entryPointsWithMiddleware,
     nodes: walkResult.nodes,
     edges: walkResult.edges,
     warnings: allWarnings,
   };
 
   const summary: AnalyzeSummary = {
-    entryPointCount: scanResult.entryPoints.length,
+    entryPointCount: entryPointsWithMiddleware.length,
     nodeCount: walkResult.nodes.length,
     edgeCount: walkResult.edges.length,
     warnings: allWarnings,
