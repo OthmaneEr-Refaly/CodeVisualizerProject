@@ -18,6 +18,14 @@ export interface EntryPoint {
   middleware: string[];
   /** Raw consumer.apply(...).forRoutes(...) source text(s), for display when a middleware node is clicked. */
   middlewareSnippet?: string;
+  /** Names from @UseInterceptors, combining class-level + method-level. Empty if none. */
+  interceptors: string[];
+  /** Raw @UseInterceptors decorator text(s), for display when an interceptor node is clicked. */
+  interceptorsSnippet?: string;
+  /** Names from @UsePipes, combining class-level + method-level. Empty if none. */
+  pipes: string[];
+  /** Raw @UsePipes decorator text(s), for display when a pipe node is clicked. */
+  pipesSnippet?: string;
 }
 
 /**
@@ -65,7 +73,7 @@ export class EntryPointScanError extends GraphxError {
 
 // --- Graph output (stage 3: call-graph walker) ---
 
-export type NodeKind = "entry" | "middleware" | "guard" | "controller" | "service" | "external";
+export type NodeKind = "entry" | "middleware" | "guard" | "interceptor" | "pipe" | "controller" | "service" | "external";
 export type EdgeKind = "triggers" | "calls";
 
 export interface GraphNode {

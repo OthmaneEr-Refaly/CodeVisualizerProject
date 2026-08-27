@@ -38,10 +38,11 @@ describe("walkCallGraph", () => {
     expect(guardNode).toMatchObject({ kind: "guard", label: "Guards: AuthGuard" });
     expect(guardNode?.snippet).toContain("@UseGuards(AuthGuard)");
 
-    // entry -> guard -> controller, and NOT a direct entry -> controller edge
+    // entry -> guard -> interceptor -> controller, and NOT a direct entry -> controller edge
     expect(result.edges).toContainEqual({ from: entryId, to: guardId, kind: "triggers" });
-    expect(result.edges).toContainEqual({ from: guardId, to: "UserController.findOne", kind: "triggers" });
+    expect(result.edges).toContainEqual({ from: guardId, to: `interceptor:${entryId}`, kind: "triggers" });
     expect(result.edges.find((e) => e.from === entryId && e.to === "UserController.findOne")).toBeUndefined();
+    expect(result.edges.find((e) => e.from === guardId && e.to === "UserController.findOne")).toBeUndefined();
   });
 
   it("combines class + method guards into one guard node label for the POST route", () => {
@@ -80,7 +81,7 @@ describe("walkCallGraph", () => {
     expect(edge).toBeDefined();
   });
 
-  it("chains entry -> middleware -> guard -> controller in that order when a route has both", () => {
+  it("chains entry -> middleware -> guard -> interceptor -> controller for the GET route (no pipe on it)", () => {
     const project = loadProject(FIXTURE_DIR, "*.ts");
     const { entryPoints } = scanEntryPoints(project);
     const { bindings } = scanMiddleware(project);
@@ -90,6 +91,7 @@ describe("walkCallGraph", () => {
     const entryId = "entry:GET:users/:id";
     const middlewareId = `middleware:${entryId}`;
     const guardId = `guard:${entryId}`;
+    const interceptorId = `interceptor:${entryId}`;
 
     const middlewareNode = result.nodes.find((n) => n.id === middlewareId);
     expect(middlewareNode).toMatchObject({
@@ -97,12 +99,65 @@ describe("walkCallGraph", () => {
       label: "Middleware: RequestLoggerMiddleware",
     });
 
-    // Full lifecycle order: entry -> middleware -> guard -> controller,
-    // with NO shortcut edges skipping a stage.
+    // Full chain for GET: entry -> middleware -> guard -> interceptor -> controller.
+    // No pipe stage — @UsePipes is only on the POST route in the fixture.
     expect(result.edges).toContainEqual({ from: entryId, to: middlewareId, kind: "triggers" });
     expect(result.edges).toContainEqual({ from: middlewareId, to: guardId, kind: "triggers" });
-    expect(result.edges).toContainEqual({ from: guardId, to: "UserController.findOne", kind: "triggers" });
+    expect(result.edges).toContainEqual({ from: guardId, to: interceptorId, kind: "triggers" });
+    expect(result.edges).toContainEqual({ from: interceptorId, to: "UserController.findOne", kind: "triggers" });
     expect(result.edges.find((e) => e.from === entryId && e.to === guardId)).toBeUndefined();
     expect(result.edges.find((e) => e.from === entryId && e.to === "UserController.findOne")).toBeUndefined();
+    expect(result.edges.find((e) => e.from === guardId && e.to === "UserController.findOne")).toBeUndefined();
+  });
+
+  it("chains entry -> middleware -> guard -> interceptor -> pipe -> controller in full lifecycle order", () => {
+    const project = loadProject(FIXTURE_DIR, "*.ts");
+    const { entryPoints } = scanEntryPoints(project);
+    const { bindings } = scanMiddleware(project);
+    const withMiddleware = attachMiddleware(entryPoints, bindings);
+    const result = walkCallGraph(project, withMiddleware);
+
+    // The POST route has all four stage types in the fixture: middleware
+    // (via the module binding), guards (class + method), interceptor
+    // (class-level), and a pipe (method-level).
+    const entryId = "entry:POST:users";
+    const middlewareId = `middleware:${entryId}`;
+    const guardId = `guard:${entryId}`;
+    const interceptorId = `interceptor:${entryId}`;
+    const pipeId = `pipe:${entryId}`;
+
+    const interceptorNode = result.nodes.find((n) => n.id === interceptorId);
+    expect(interceptorNode).toMatchObject({ kind: "interceptor", label: "Interceptors: LoggingInterceptor" });
+
+    const pipeNode = result.nodes.find((n) => n.id === pipeId);
+    expect(pipeNode).toMatchObject({ kind: "pipe", label: "Pipes: ValidationPipe" });
+
+    // Every hop present, in the correct order, no stage skipped.
+    expect(result.edges).toContainEqual({ from: entryId, to: middlewareId, kind: "triggers" });
+    expect(result.edges).toContainEqual({ from: middlewareId, to: guardId, kind: "triggers" });
+    expect(result.edges).toContainEqual({ from: guardId, to: interceptorId, kind: "triggers" });
+    expect(result.edges).toContainEqual({ from: interceptorId, to: pipeId, kind: "triggers" });
+    expect(result.edges).toContainEqual({ from: pipeId, to: "UserController.create", kind: "triggers" });
+
+    // No shortcut edges skipping any stage.
+    expect(result.edges.find((e) => e.from === guardId && e.to === "UserController.create")).toBeUndefined();
+    expect(result.edges.find((e) => e.from === entryId && e.to === "UserController.create")).toBeUndefined();
+  });
+
+  it("skips the pipe stage entirely for a route that has none", () => {
+    const project = loadProject(FIXTURE_DIR, "*.ts");
+    const { entryPoints } = scanEntryPoints(project);
+    const result = walkCallGraph(project, entryPoints);
+
+    // GET /users/:id has guards and a class-level interceptor, but no
+    // @UsePipes — its chain should go straight from interceptor to controller.
+    const entryId = "entry:GET:users/:id";
+    const nodeIds = result.nodes.map((n) => n.id);
+    expect(nodeIds).not.toContain(`pipe:${entryId}`);
+    expect(result.edges).toContainEqual({
+      from: `interceptor:${entryId}`,
+      to: "UserController.findOne",
+      kind: "triggers",
+    });
   });
 });

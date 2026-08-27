@@ -9,6 +9,8 @@ declare module "@nestjs/common" {
   export function Param(key?: string): ParameterDecorator;
   export function Body(): ParameterDecorator;
   export function UseGuards(...guards: unknown[]): ClassDecorator & MethodDecorator;
+  export function UseInterceptors(...interceptors: unknown[]): ClassDecorator & MethodDecorator;
+  export function UsePipes(...pipes: unknown[]): ClassDecorator & MethodDecorator;
   export function Module(metadata: { controllers?: unknown[]; providers?: unknown[] }): ClassDecorator;
 
   export interface MiddlewareConsumer {

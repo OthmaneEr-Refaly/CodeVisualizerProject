@@ -12,8 +12,11 @@
     --text-dim: #8a8a92;
     --line: #3a3a42;
     --entry: #f5a623;
+    --response: #f5a623;
     --middleware: #22d3ee;
     --guard: #a78bfa;
+    --interceptor: #34d399;
+    --pipe: #f472b6;
     --controller: #f2994a;
     --service: #4f8cff;
     --external: #2dd4bf;
@@ -33,6 +36,12 @@
   #toolbar .stats { font-size: 13px; color: var(--text-dim); }
   #toolbar input[type=file] { color: var(--text-dim); font-size: 13px; }
   #toolbar .warn { color: var(--entry); font-size: 13px; }
+  #toolbar .current-route { font-size: 13px; color: var(--text); font-weight: 600; }
+  .back-btn {
+    background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .back-btn:hover { border-color: #55555f; }
   #empty-state {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; color: var(--text-dim); font-size: 14px;
@@ -56,8 +65,11 @@
     margin-right: 6px;
   }
   .node-card .kind-dot.entry { background: var(--entry); }
+  .node-card .kind-dot.response { background: var(--response); }
   .node-card .kind-dot.middleware { background: var(--middleware); }
   .node-card .kind-dot.guard { background: var(--guard); }
+  .node-card .kind-dot.interceptor { background: var(--interceptor); }
+  .node-card .kind-dot.pipe { background: var(--pipe); }
   .node-card .kind-dot.controller { background: var(--controller); }
   .node-card .kind-dot.service { background: var(--service); }
   .node-card .kind-dot.external { background: var(--external); }
@@ -81,6 +93,27 @@
     float: right; cursor: pointer; color: var(--text-dim); font-size: 13px;
     background: none; border: none;
   }
+  #detail-panel .used-elsewhere {
+    font-size: 12px; color: var(--text-dim); margin-top: 14px;
+    padding-top: 12px; border-top: 1px solid var(--card-border);
+  }
+  #detail-panel .used-elsewhere .route-chip {
+    display: inline-block; background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 5px; padding: 2px 8px; margin: 4px 4px 0 0; font-size: 11px; color: var(--text);
+  }
+  .root-card {
+    position: absolute; width: 260px; background: var(--card-bg);
+    border: 1px solid var(--entry); border-radius: 10px; padding: 14px 16px;
+    text-align: center; font-size: 14px; font-weight: 600; color: var(--entry);
+  }
+  .route-choice-card {
+    position: absolute; width: 220px; background: var(--card-bg);
+    border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 14px;
+    cursor: pointer; transition: border-color 0.12s, transform 0.12s;
+  }
+  .route-choice-card:hover { border-color: var(--entry); transform: translateY(-1px); }
+  .route-choice-card .label { font-size: 13px; font-weight: 600; }
+  .route-choice-card .sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -88,6 +121,8 @@
 
 <div id="toolbar">
   <h1>graphx viewer</h1>
+  <button id="backBtn" class="back-btn" style="display:none">← routes</button>
+  <span class="current-route" id="currentRouteLabel"></span>
   <input type="file" id="fileInput" accept=".json" />
   <span class="stats" id="stats"></span>
   <span class="warn" id="warnCount"></span>
@@ -106,6 +141,7 @@
   <h2 id="detailLabel"></h2>
   <div class="meta" id="detailMeta"></div>
   <pre id="detailSnippet"></pre>
+  <div class="used-elsewhere" id="detailUsedElsewhere" style="display:none"></div>
 </div>
 
 <script>
@@ -122,17 +158,30 @@
   const nodesLayer = document.getElementById("nodesLayer");
   const statsEl = document.getElementById("stats");
   const warnEl = document.getElementById("warnCount");
+  const backBtn = document.getElementById("backBtn");
+  const currentRouteLabel = document.getElementById("currentRouteLabel");
   const detailPanel = document.getElementById("detail-panel");
   const detailLabel = document.getElementById("detailLabel");
   const detailMeta = document.getElementById("detailMeta");
   const detailSnippet = document.getElementById("detailSnippet");
+  const detailUsedElsewhere = document.getElementById("detailUsedElsewhere");
   document.getElementById("closeDetail").onclick = () => detailPanel.classList.remove("open");
+  backBtn.onclick = () => showRoutePicker();
+
+  // The full graph, kept in memory the whole time — a route view only ever
+  // renders a filtered slice of this, it never throws the rest away. That's
+  // what lets "used elsewhere" work: we can always look a node up against
+  // everything, even while only showing one route's subgraph.
+  let fullGraphData = null;
+  // nodeId -> [{id, label}, ...] — every entry point whose subgraph reaches this node.
+  let reachedByEntry = new Map();
+  let currentEntryId = null;
 
   // If a standalone viewer was generated with embedded data (graphx analyze --open),
-  // render immediately and hide the file picker — no manual load step needed.
+  // load immediately and hide the file picker — no manual load step needed.
   if (window.__GRAPHX_DATA__) {
     fileInput.style.display = "none";
-    render(window.__GRAPHX_DATA__);
+    loadGraph(window.__GRAPHX_DATA__);
   }
 
   fileInput.addEventListener("change", (e) => {
@@ -142,7 +191,7 @@
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result);
-        render(data);
+        loadGraph(data);
       } catch (err) {
         alert("Could not parse that file as JSON: " + err.message);
       }
@@ -150,15 +199,139 @@
     reader.readAsText(file);
   });
 
-  function render(data) {
-    const nodes = data.nodes || [];
-    const edges = data.edges || [];
-    const warnings = data.warnings || [];
+  function loadGraph(data) {
+    fullGraphData = data;
+    fullGraphData.nodes = fullGraphData.nodes || [];
+    fullGraphData.edges = fullGraphData.edges || [];
 
     emptyState.style.display = "none";
-    statsEl.textContent = `${nodes.length} nodes · ${edges.length} edges`;
+    statsEl.textContent = `${fullGraphData.nodes.length} nodes · ${fullGraphData.edges.length} edges`;
+    const warnings = fullGraphData.warnings || [];
     warnEl.textContent = warnings.length ? `${warnings.length} warning(s)` : "";
 
+    buildReachabilityIndex();
+    showRoutePicker();
+  }
+
+  function buildAdjacency(edges) {
+    const adjacency = new Map();
+    edges.forEach((e) => {
+      if (!adjacency.has(e.from)) adjacency.set(e.from, []);
+      adjacency.get(e.from).push(e.to);
+    });
+    return adjacency;
+  }
+
+  function bfsReachable(startId, adjacency) {
+    const seen = new Set([startId]);
+    const queue = [startId];
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const next of adjacency.get(cur) || []) {
+        if (!seen.has(next)) {
+          seen.add(next);
+          queue.push(next);
+        }
+      }
+    }
+    return seen;
+  }
+
+  // For every node, which entry points' subgraphs reach it. A node reached
+  // by more than one entry point is genuinely shared (e.g. a logger every
+  // route calls) — that's what powers the "also used by" panel.
+  function buildReachabilityIndex() {
+    reachedByEntry = new Map();
+    const adjacency = buildAdjacency(fullGraphData.edges);
+    const entryNodes = fullGraphData.nodes.filter((n) => n.kind === "entry");
+
+    entryNodes.forEach((entry) => {
+      const reached = bfsReachable(entry.id, adjacency);
+      reached.forEach((id) => {
+        if (!reachedByEntry.has(id)) reachedByEntry.set(id, []);
+        reachedByEntry.get(id).push(entry);
+      });
+    });
+  }
+
+  function showRoutePicker() {
+    currentEntryId = null;
+    backBtn.style.display = "none";
+    currentRouteLabel.textContent = "";
+    detailPanel.classList.remove("open");
+    svg.innerHTML = "";
+    nodesLayer.innerHTML = "";
+
+    const entryNodes = fullGraphData.nodes.filter((n) => n.kind === "entry");
+
+    const rootCard = document.createElement("div");
+    rootCard.className = "root-card";
+    rootCard.style.left = START_X + "px";
+    rootCard.style.top = START_Y + "px";
+    rootCard.textContent = "Upcoming Server Request";
+    nodesLayer.appendChild(rootCard);
+
+    const choiceY = START_Y + 100;
+    entryNodes.forEach((entry, i) => {
+      const card = document.createElement("div");
+      card.className = "route-choice-card";
+      card.style.left = START_X + "px";
+      card.style.top = (choiceY + i * (CARD_HEIGHT_EST + ROW_GAP)) + "px";
+      card.innerHTML = `
+        <div class="label"><span class="kind-dot entry"></span>${escapeHtml(entry.label)}</div>
+        <div class="sub">click to trace this route</div>
+      `;
+      card.onclick = () => selectRoute(entry.id);
+      nodesLayer.appendChild(card);
+    });
+
+    if (entryNodes.length === 0) {
+      const msg = document.createElement("div");
+      msg.style.cssText = "position:absolute; left:40px; top:100px; color:var(--text-dim); font-size:13px;";
+      msg.textContent = "No entry points found in this graph.";
+      nodesLayer.appendChild(msg);
+    }
+
+    canvas.style.width = (START_X + 260 + 60) + "px";
+    canvas.style.height = (choiceY + entryNodes.length * (CARD_HEIGHT_EST + ROW_GAP) + 40) + "px";
+  }
+
+  function selectRoute(entryId) {
+    currentEntryId = entryId;
+    const entryNode = fullGraphData.nodes.find((n) => n.id === entryId);
+    currentRouteLabel.textContent = entryNode ? entryNode.label : "";
+    backBtn.style.display = "";
+
+    const adjacency = buildAdjacency(fullGraphData.edges);
+    const reachable = bfsReachable(entryId, adjacency);
+
+    const filteredNodes = fullGraphData.nodes.filter((n) => reachable.has(n.id));
+    const filteredEdges = fullGraphData.edges.filter(
+      (e) => reachable.has(e.from) && reachable.has(e.to)
+    );
+
+    const { nodes, edges } = addTerminalNode(filteredNodes, filteredEdges, entryId);
+    renderGraph(nodes, edges);
+  }
+
+  // Adds a synthetic "Sending the Response Back" card after every leaf node
+  // in this route's subgraph (a leaf = nothing calls anything further). This
+  // is purely a display node for this one route's view — it's never written
+  // into fullGraphData, never part of the reachability index, and never
+  // appears when you're looking at a different route.
+  function addTerminalNode(nodes, edges) {
+    const hasOutgoing = new Set(edges.map((e) => e.from));
+    const leafIds = nodes.filter((n) => !hasOutgoing.has(n.id)).map((n) => n.id);
+    if (leafIds.length === 0) return { nodes, edges };
+
+    const responseId = "response:" + currentEntryId;
+    const responseNode = { id: responseId, label: "Sending the Response Back", kind: "response" };
+    const returnEdges = leafIds.map((leafId) => ({ from: leafId, to: responseId, kind: "returns" }));
+
+    return { nodes: [...nodes, responseNode], edges: [...edges, ...returnEdges] };
+  }
+
+  function renderGraph(nodes, edges) {
     const levels = assignLevels(nodes, edges);
     const positions = layoutPositions(levels);
 
@@ -183,7 +356,7 @@
   // controller and everything downstream one column to the left. Without this,
   // routes with a guard end up staircased one column further right than
   // routes without one, and same-stage cards stop lining up across rows.
-  const STAGE_COLUMN = { entry: 0, middleware: 1, guard: 2, controller: 3 };
+  const STAGE_COLUMN = { entry: 0, middleware: 1, guard: 2, interceptor: 3, pipe: 4, controller: 5 };
 
   function assignLevels(nodes, edges) {
     const level = new Map();
@@ -202,6 +375,16 @@
     // BFS forward from every controller (fixed at column 2) to place service /
     // external nodes at column 3, 4, 5... by how many hops deep they are.
     // Fixed-stage nodes are never revisited — their column is already decided.
+    // A controller calling multiple services naturally lands them at the same
+    // column, side by side — this is the fan-out-within-a-route case, and it
+    // falls out of the same BFS with no extra logic needed.
+    //
+    // This takes the LONGEST path from a controller, not the shortest — a
+    // node fed by two predecessors at different depths (like the terminal
+    // "response" node, reached by both a shallow and a deep leaf) must sit
+    // strictly after ALL of them, not just the nearest one. Taking the
+    // shortest path here could place a node in the same column as — or even
+    // before — one of its own predecessors, which draws an edge backwards.
     const controllerNodes = nodes.filter((n) => n.kind === "controller");
     let queue = controllerNodes.map((n) => ({ id: n.id, lvl: level.get(n.id) }));
 
@@ -209,7 +392,7 @@
       const { id, lvl } = queue.shift();
       for (const nextId of adjacency.get(id) || []) {
         if (fixedNodeIds.has(nextId)) continue;
-        if (!level.has(nextId) || level.get(nextId) > lvl + 1) {
+        if (!level.has(nextId) || level.get(nextId) < lvl + 1) {
           level.set(nextId, lvl + 1);
           queue.push({ id: nextId, lvl: lvl + 1 });
         }
@@ -260,9 +443,11 @@
       card.dataset.nodeId = node.id;
 
       const kind = node.kind || "service";
+      const sharedCount = (reachedByEntry.get(node.id) || []).length;
+      const sharedBadge = sharedCount > 1 ? ` <span class="sub" style="color:var(--guard)">· shared</span>` : "";
       card.innerHTML = `
         <div class="label"><span class="kind-dot ${kind}"></span>${escapeHtml(node.label)}</div>
-        <div class="sub">${escapeHtml(subtitleFor(node))}</div>
+        <div class="sub">${escapeHtml(subtitleFor(node))}${sharedBadge}</div>
       `;
       card.onclick = () => selectNode(node, card);
       nodesLayer.appendChild(card);
@@ -271,6 +456,7 @@
 
   function subtitleFor(node) {
     if (node.kind === "entry") return "entry point";
+    if (node.kind === "response") return "end of request";
     if (node.filePath) {
       const short = node.filePath.split("/").slice(-1)[0];
       return node.line ? `${short}:${node.line}` : short;
@@ -286,6 +472,16 @@
     detailMeta.textContent = [node.kind, node.filePath, node.line ? `line ${node.line}` : null]
       .filter(Boolean).join(" · ");
     detailSnippet.textContent = node.snippet || "(no snippet captured for this node)";
+
+    const usedBy = (reachedByEntry.get(node.id) || []).filter((e) => e.id !== currentEntryId);
+    if (usedBy.length > 0) {
+      const chips = usedBy.map((e) => `<span class="route-chip">${escapeHtml(e.label)}</span>`).join("");
+      detailUsedElsewhere.innerHTML = `Also used by:<br>${chips}`;
+      detailUsedElsewhere.style.display = "";
+    } else {
+      detailUsedElsewhere.style.display = "none";
+    }
+
     detailPanel.classList.add("open");
   }
 
