@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-15T16:03:29.691Z",
+  "generatedAt": "2026-08-20T12:41:08.653Z",
   "entryPoints": [
     {
       "httpMethod": "GET",
@@ -10,7 +10,9 @@
       "filePath": "/Users/admin/Downloads/Projects/nest-project01/src/app.controller.ts",
       "line": 8,
       "guards": [],
-      "middleware": []
+      "middleware": [],
+      "interceptors": [],
+      "pipes": []
     },
     {
       "httpMethod": "GET",
@@ -23,6 +25,8 @@
       "middleware": [
         "ApiKeyMiddleware"
       ],
+      "interceptors": [],
+      "pipes": [],
       "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
@@ -36,6 +40,8 @@
       "middleware": [
         "ApiKeyMiddleware"
       ],
+      "interceptors": [],
+      "pipes": [],
       "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
@@ -49,6 +55,8 @@
       "middleware": [
         "ApiKeyMiddleware"
       ],
+      "interceptors": [],
+      "pipes": [],
       "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
@@ -62,6 +70,8 @@
       "middleware": [
         "ApiKeyMiddleware"
       ],
+      "interceptors": [],
+      "pipes": [],
       "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     },
     {
@@ -78,6 +88,8 @@
       "middleware": [
         "ApiKeyMiddleware"
       ],
+      "interceptors": [],
+      "pipes": [],
       "middlewareSnippet": "consumer.apply(ApiKeyMiddleware).forRoutes(UserController)"
     }
   ],

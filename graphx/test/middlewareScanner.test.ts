@@ -59,6 +59,8 @@ describe("attachMiddleware", () => {
         line: 1,
         guards: [],
         middleware: [],
+        interceptors: [],
+        pipes: [],
       },
     ];
     const bindings = [
@@ -86,6 +88,8 @@ describe("attachMiddleware", () => {
         line: 1,
         guards: [],
         middleware: [],
+        interceptors: [],
+        pipes: [],
       },
     ];
     const bindings = [

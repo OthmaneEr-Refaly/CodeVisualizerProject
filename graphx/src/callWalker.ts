@@ -50,41 +50,49 @@ export function walkCallGraph(project: Project, entryPoints: EntryPoint[]): Walk
     if (!controllerNodeId) continue;
 
     // Chain order matches NestJS's real request lifecycle:
-    // entry -> middleware -> guard -> controller -> service...
+    // entry -> middleware -> guard -> interceptor -> pipe -> controller -> service...
     let lastNodeId = entryNodeId;
-
-    if (entry.middleware.length > 0) {
-      const middlewareNodeId = `middleware:${entryNodeId}`;
-      nodes.set(middlewareNodeId, {
-        id: middlewareNodeId,
-        label: `Middleware: ${entry.middleware.join(", ")}`,
-        kind: "middleware",
-        filePath: entry.filePath,
-        line: entry.line,
-        snippet: entry.middlewareSnippet,
-      });
-      edges.push({ from: lastNodeId, to: middlewareNodeId, kind: "triggers" });
-      lastNodeId = middlewareNodeId;
-    }
-
-    if (entry.guards.length > 0) {
-      const guardNodeId = `guard:${entryNodeId}`;
-      nodes.set(guardNodeId, {
-        id: guardNodeId,
-        label: `Guards: ${entry.guards.join(", ")}`,
-        kind: "guard",
-        filePath: entry.filePath,
-        line: entry.line,
-        snippet: entry.guardsSnippet,
-      });
-      edges.push({ from: lastNodeId, to: guardNodeId, kind: "triggers" });
-      lastNodeId = guardNodeId;
-    }
+    lastNodeId = addChainStage(lastNodeId, entryNodeId, "middleware", entry.middleware, entry.middlewareSnippet, entry);
+    lastNodeId = addChainStage(lastNodeId, entryNodeId, "guard", entry.guards, entry.guardsSnippet, entry);
+    lastNodeId = addChainStage(lastNodeId, entryNodeId, "interceptor", entry.interceptors, entry.interceptorsSnippet, entry);
+    lastNodeId = addChainStage(lastNodeId, entryNodeId, "pipe", entry.pipes, entry.pipesSnippet, entry);
 
     edges.push({ from: lastNodeId, to: controllerNodeId, kind: "triggers" });
   }
 
   return { nodes: Array.from(nodes.values()), edges, warnings };
+
+  /**
+   * Inserts one lifecycle-stage node (middleware/guard/interceptor/pipe)
+   * between whatever came before it and what comes next — but only if this
+   * route actually has any bindings for that stage. Returns the id to chain
+   * the next stage from: either the new node, or unchanged if nothing was added.
+   */
+  function addChainStage(
+    fromId: string,
+    entryNodeId: string,
+    kind: "middleware" | "guard" | "interceptor" | "pipe",
+    names: string[],
+    snippet: string | undefined,
+    entry: EntryPoint
+  ): string {
+    if (names.length === 0) return fromId;
+
+    const label = kind === "middleware" ? "Middleware" : kind === "guard" ? "Guards"
+      : kind === "interceptor" ? "Interceptors" : "Pipes";
+    const stageNodeId = `${kind}:${entryNodeId}`;
+
+    nodes.set(stageNodeId, {
+      id: stageNodeId,
+      label: `${label}: ${names.join(", ")}`,
+      kind,
+      filePath: entry.filePath,
+      line: entry.line,
+      snippet,
+    });
+    edges.push({ from: fromId, to: stageNodeId, kind: "triggers" });
+    return stageNodeId;
+  }
 
   /** Returns the node id for this method, after adding it + recursing into what it calls. */
   function walkMethod(

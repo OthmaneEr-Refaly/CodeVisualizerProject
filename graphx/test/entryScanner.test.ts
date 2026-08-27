@@ -73,4 +73,26 @@ describe("scanEntryPoints", () => {
     const result = scanEntryPoints(project);
     result.entryPoints.forEach((e) => expect(Array.isArray(e.guards)).toBe(true));
   });
+
+  it("picks up a class-level @UseInterceptors and applies it to every route on that controller", () => {
+    const project = loadProject(FIXTURE_DIR, "*.ts");
+    const result = scanEntryPoints(project);
+
+    const getRoute = result.entryPoints.find((e) => e.methodName === "findOne");
+    expect(getRoute?.interceptors).toEqual(["LoggingInterceptor"]);
+    expect(getRoute?.interceptorsSnippet).toContain("@UseInterceptors(LoggingInterceptor)");
+  });
+
+  it("picks up a method-level @UsePipes without affecting routes that don't have one", () => {
+    const project = loadProject(FIXTURE_DIR, "*.ts");
+    const result = scanEntryPoints(project);
+
+    const postRoute = result.entryPoints.find((e) => e.methodName === "create");
+    expect(postRoute?.pipes).toEqual(["ValidationPipe"]);
+    expect(postRoute?.pipesSnippet).toContain("@UsePipes(ValidationPipe)");
+
+    const getRoute = result.entryPoints.find((e) => e.methodName === "findOne");
+    expect(getRoute?.pipes).toEqual([]);
+    expect(getRoute?.pipesSnippet).toBeUndefined();
+  });
 });
